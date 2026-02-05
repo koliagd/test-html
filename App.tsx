@@ -1,5 +1,5 @@
 import React from 'react';
-import { SoundButton } from './components/SoundButton';
+import { SoundButton } from './components/SoundButton.tsx';
 import { Zap } from 'lucide-react';
 
 const App: React.FC = () => {
@@ -25,7 +25,7 @@ const App: React.FC = () => {
         <main className="flex justify-center items-center py-12">
           <div className="p-10 bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-3xl shadow-2xl">
             <SoundButton 
-              soundUrl="0x01be5440.mp3" 
+              soundUrl="./0x01be5440.mp3" 
               label="ВЫСТРЕЛ" 
             />
           </div>
@@ -36,7 +36,7 @@ const App: React.FC = () => {
             <Zap size={16} />
             <span>Powered by George Technologies (Blue)</span>
           </div>
-          <p className="mt-2 text-xs opacity-50">.mp3 file must be present in root directory</p>
+          <p className="mt-2 text-xs opacity-50">.mp3 file must be in the same folder</p>
         </footer>
       </div>
     </div>
