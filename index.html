@@ -6,13 +6,14 @@
     <title>Epland Sound Button</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap" rel="stylesheet">
-    <!-- Babel Standalone to run React/TSX directly in browser without build -->
+    <!-- Babel Standalone to compile our TSX code in the browser -->
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <style>
       body {
         font-family: 'Inter', sans-serif;
       }
     </style>
+    <!-- Fixed Import Map: Only React 18 to avoid conflicts -->
     <script type="importmap">
 {
   "imports": {
@@ -26,10 +27,8 @@
 </script>
   </head>
   <body class="bg-slate-900 text-slate-100 antialiased">
-    <div id="root" class="flex items-center justify-center min-h-screen text-slate-500 animate-pulse">
-      Загрузка Эпланда... 🍎
-    </div>
-    <!-- Changed to text/babel so Babel compiles it on the fly -->
-    <script type="text/babel" data-type="module" data-presets="react,typescript" src="./index.tsx"></script>
+    <div id="root"></div>
+    <!-- Load the main script -->
+    <script type="text/babel" data-type="module" src="./index.tsx"></script>
   </body>
 </html>
