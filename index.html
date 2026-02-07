@@ -73,22 +73,22 @@
                 try {
                     setStatus('SHOOTING');
                     
-                    // 1. Play Shoot Sound
                     const shootAudio = new Audio(soundUrl);
                     
-                    shootAudio.onended = () => {
-                        // 2. When shoot ends, start Reload
+                    // Logic to run the reload sequence
+                    const triggerReload = () => {
+                        // Switch UI to reloading immediately when timer hits
                         setStatus('RELOADING');
+                        
                         const reloadAudio = new Audio(reloadUrl);
                         
                         reloadAudio.onended = () => {
-                            // 3. When reload ends, back to IDLE
                             setStatus('IDLE');
                         };
 
                         reloadAudio.onerror = (e) => {
                             console.error("Failed to load reload audio:", e);
-                            setStatus('IDLE'); // Recover to IDLE even if reload fails
+                            setStatus('IDLE');
                         };
 
                         reloadAudio.play().catch(e => {
@@ -97,20 +97,39 @@
                         });
                     };
 
+                    // Calculate when to start reloading (60% of duration)
+                    const scheduleReload = () => {
+                        const duration = shootAudio.duration;
+                        
+                        if (duration && isFinite(duration)) {
+                            // 60% delay
+                            const delay = duration * 0.6 * 1000;
+                            setTimeout(triggerReload, delay);
+                        } else {
+                            // Fallback if duration is unknown (shouldn't happen often): wait for end
+                            shootAudio.onended = triggerReload;
+                        }
+                    };
+
+                    // Wait for metadata to get duration
+                    if (shootAudio.readyState >= 1) {
+                        scheduleReload();
+                    } else {
+                        shootAudio.onloadedmetadata = scheduleReload;
+                    }
+
                     shootAudio.onerror = (e) => {
                         console.error("Failed to load shoot audio:", e);
                         setStatus('ERROR');
                         setTimeout(() => setStatus('IDLE'), 2000);
                     };
 
-                    const playPromise = shootAudio.play();
-                    if (playPromise !== undefined) {
-                        playPromise.catch((error) => {
-                            console.error("Audio playback failed:", error);
-                            setStatus('ERROR');
-                            setTimeout(() => setStatus('IDLE'), 2000);
-                        });
-                    }
+                    shootAudio.play().catch((error) => {
+                        console.error("Audio playback failed:", error);
+                        setStatus('ERROR');
+                        setTimeout(() => setStatus('IDLE'), 2000);
+                    });
+
                 } catch (err) {
                     console.error("Error initializing audio:", err);
                     setStatus('ERROR');
