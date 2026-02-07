@@ -16,15 +16,22 @@
     
     <style>
         body { font-family: 'Inter', sans-serif; }
+        @keyframes spin-slow {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        .animate-spin-slow {
+            animation: spin-slow 2s linear infinite;
+        }
     </style>
 </head>
 <body class="bg-slate-900 text-slate-100 antialiased">
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useCallback } = React;
+        const { useState, useCallback, useEffect } = React;
 
-        // Icons as simple components to avoid external dependency issues in single-file mode
+        // Icons
         const VolumeIcon = ({ className }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
@@ -41,93 +48,132 @@
             </svg>
         );
 
+        const RefreshIcon = ({ className }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8"></path>
+                <path d="M21 3v5h-5"></path>
+                <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16"></path>
+                <path d="M8 16H3v5"></path>
+            </svg>
+        );
+
         const ZapIcon = ({ size }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
             </svg>
         );
 
-        const SoundButton = ({ soundUrl, label = "PLAY" }) => {
-            const [isPlaying, setIsPlaying] = useState(false);
-            const [error, setError] = useState(false);
+        const SoundButton = ({ soundUrl, reloadUrl, label = "PLAY" }) => {
+            // States: 'IDLE', 'SHOOTING', 'RELOADING', 'ERROR'
+            const [status, setStatus] = useState('IDLE');
 
-            const playSound = useCallback(() => {
+            const playSequence = useCallback(() => {
+                if (status !== 'IDLE') return; // Prevent spamming
+
                 try {
-                    setError(false);
-                    setIsPlaying(true);
+                    setStatus('SHOOTING');
                     
-                    const audio = new Audio(soundUrl);
+                    // 1. Play Shoot Sound
+                    const shootAudio = new Audio(soundUrl);
                     
-                    audio.onended = () => {
-                        // Animation handles the visual reset usually, but we can ensure it here if needed
+                    shootAudio.onended = () => {
+                        // 2. When shoot ends, start Reload
+                        setStatus('RELOADING');
+                        const reloadAudio = new Audio(reloadUrl);
+                        
+                        reloadAudio.onended = () => {
+                            // 3. When reload ends, back to IDLE
+                            setStatus('IDLE');
+                        };
+
+                        reloadAudio.onerror = (e) => {
+                            console.error("Failed to load reload audio:", e);
+                            setStatus('IDLE'); // Recover to IDLE even if reload fails
+                        };
+
+                        reloadAudio.play().catch(e => {
+                            console.error("Reload playback failed:", e);
+                            setStatus('IDLE');
+                        });
                     };
 
-                    audio.onerror = (e) => {
-                        console.error("Failed to load audio:", e);
-                        setError(true);
-                        setIsPlaying(false);
+                    shootAudio.onerror = (e) => {
+                        console.error("Failed to load shoot audio:", e);
+                        setStatus('ERROR');
+                        setTimeout(() => setStatus('IDLE'), 2000);
                     };
 
-                    const playPromise = audio.play();
-                    
+                    const playPromise = shootAudio.play();
                     if (playPromise !== undefined) {
-                        playPromise
-                        .then(() => {
-                            // Reset button visual state shortly after click for "impact" feel
-                            setTimeout(() => setIsPlaying(false), 200);
-                        })
-                        .catch((error) => {
+                        playPromise.catch((error) => {
                             console.error("Audio playback failed:", error);
-                            setError(true);
-                            setIsPlaying(false);
+                            setStatus('ERROR');
+                            setTimeout(() => setStatus('IDLE'), 2000);
                         });
                     }
                 } catch (err) {
                     console.error("Error initializing audio:", err);
-                    setError(true);
-                    setIsPlaying(false);
+                    setStatus('ERROR');
+                    setTimeout(() => setStatus('IDLE'), 2000);
                 }
-            }, [soundUrl]);
+            }, [soundUrl, reloadUrl, status]);
+
+            // Determine UI based on status
+            const isShooting = status === 'SHOOTING';
+            const isReloading = status === 'RELOADING';
+            const isError = status === 'ERROR';
+
+            let buttonColorClass = 'bg-red-500 hover:bg-red-400 hover:-translate-y-1 hover:shadow-[0_15px_30px_rgba(220,38,38,0.4)]';
+            let icon = <VolumeIcon className="mb-2" />;
+            let text = label;
+
+            if (isShooting) {
+                buttonColorClass = 'bg-red-600 scale-95 shadow-inner cursor-default';
+                icon = <VolumeIcon className="mb-2 scale-125" />;
+                text = "БАБАХ!";
+            } else if (isReloading) {
+                buttonColorClass = 'bg-orange-500 scale-100 cursor-wait shadow-[0_0_20px_rgba(249,115,22,0.4)]';
+                icon = <RefreshIcon className="mb-2 animate-spin-slow" />;
+                text = "ЗАРЯЖАЮ...";
+            } else if (isError) {
+                buttonColorClass = 'bg-slate-700 cursor-not-allowed';
+                icon = <AlertIcon className="text-red-400 mb-2" />;
+                text = "ERROR";
+            }
 
             return (
                 <div className="flex flex-col items-center gap-4">
                     <button
-                        onClick={playSound}
+                        onClick={playSequence}
+                        disabled={status !== 'IDLE'}
                         className={`
                         relative group w-48 h-48 rounded-full 
                         border-8 border-slate-700
                         flex items-center justify-center
-                        transition-all duration-100 ease-out
+                        transition-all duration-200 ease-out
                         outline-none focus:ring-4 focus:ring-red-500/50
                         shadow-[0_10px_20px_rgba(0,0,0,0.5),inset_0_-5px_10px_rgba(0,0,0,0.3)]
-                        active:scale-95 active:shadow-[0_2px_5px_rgba(0,0,0,0.5),inset_0_2px_5px_rgba(0,0,0,0.3)]
-                        ${isPlaying ? 'bg-red-600 scale-95 shadow-inner' : 'bg-red-500 hover:bg-red-400 hover:-translate-y-1 hover:shadow-[0_15px_30px_rgba(220,38,38,0.4)]'}
+                        ${buttonColorClass}
                         `}
-                        aria-label="Play Sound"
+                        aria-label="Play Sound Sequence"
                     >
                         <div className="absolute top-4 left-10 w-16 h-8 bg-white/20 rounded-full blur-md skew-x-12 pointer-events-none"></div>
                         <div className="flex flex-col items-center justify-center text-white z-10 pointer-events-none select-none">
-                        {error ? (
-                            <AlertIcon className="text-red-900 mb-2" />
-                        ) : (
-                            <VolumeIcon 
-                            className={`mb-2 transition-transform duration-100 ${isPlaying ? 'scale-125' : 'scale-100'}`} 
-                            />
-                        )}
-                        <span className="font-black text-xl tracking-wider uppercase drop-shadow-md">
-                            {error ? "ERROR" : label}
-                        </span>
+                            {icon}
+                            <span className="font-black text-xl tracking-wider uppercase drop-shadow-md">
+                                {text}
+                            </span>
                         </div>
-                        <span className="absolute inset-0 rounded-full overflow-hidden">
-                            {isPlaying && (
+                        {isShooting && (
+                            <span className="absolute inset-0 rounded-full overflow-hidden pointer-events-none">
                                 <span className="absolute inset-0 rounded-full bg-white/30 animate-ping"></span>
-                            )}
-                        </span>
+                            </span>
+                        )}
                     </button>
                     
-                    {error && (
+                    {isError && (
                         <p className="text-red-400 text-sm font-medium animate-pulse max-w-[200px] text-center">
-                            File "{soundUrl}" not found.
+                           Check console. Files missing?
                         </p>
                     )}
                 </div>
@@ -147,10 +193,10 @@
                 <div className="z-10 text-center space-y-8 p-6">
                     <header className="space-y-2">
                     <h1 className="text-4xl md:text-6xl font-extrabold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-400 to-red-400">
-                        Epland Soundboard
+                        Epland Arsenal
                     </h1>
                     <p className="text-slate-400 text-lg md:text-xl font-light">
-                        Нажмите кнопку, чтобы воспроизвести звук
+                        Нажмите для выстрела и перезарядки
                     </p>
                     </header>
 
@@ -158,7 +204,8 @@
                     <div className="p-10 bg-slate-800/50 backdrop-blur-xl border border-slate-700/50 rounded-3xl shadow-2xl">
                         <SoundButton 
                         soundUrl="./0x01be5440.mp3" 
-                        label="ВЫСТРЕЛ" 
+                        reloadUrl="./sfx00078.mp3"
+                        label="ОГОНЬ" 
                         />
                     </div>
                     </main>
@@ -168,7 +215,7 @@
                         <ZapIcon size={16} />
                         <span>Powered by George Technologies (Blue)</span>
                     </div>
-                    <p className="mt-2 text-xs opacity-50">.mp3 file must be in the root folder</p>
+                    <p className="mt-2 text-xs opacity-50">Files: 0x01be5440.mp3, sfx00078.mp3</p>
                     </footer>
                 </div>
                 </div>
