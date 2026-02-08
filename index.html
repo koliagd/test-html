@@ -130,8 +130,8 @@
                         
                         // FIX: Adjust Visual Model inside the container
                         model.scale.set(4, 4, 4);      // Bigger size
-                        model.position.y = 1.5;        // Lift from ground
-                        model.rotation.y = -Math.PI / 2; // Rotate -90 deg to face Forward (if model faces Left)
+                        model.position.y = 4.0;        // Lift higher (was 1.5, causing clipping)
+                        model.rotation.y = Math.PI / 2; // Rotate 90 deg positive (was -90)
                         
                         model.traverse((node) => {
                             if (node.isMesh) node.castShadow = true;
