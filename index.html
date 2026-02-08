@@ -50,7 +50,7 @@
                 scene: null,
                 camera: null,
                 renderer: null,
-                player: null,
+                player: null, // This will be the wrapper Group
                 mixer: null,
                 clock: new THREE.Clock(),
                 keys: { w: false, a: false, s: false, d: false },
@@ -123,18 +123,28 @@
                     './Яблокин.glb',
                     (gltf) => {
                         const model = gltf.scene;
-                        model.scale.set(1, 1, 1); // Adjust scale if needed
-                        model.position.set(0, 0, 0);
+                        
+                        // FIX: Create a wrapper group for physics/logic
+                        const playerContainer = new THREE.Group();
+                        playerContainer.position.set(0, 0, 0);
+                        
+                        // FIX: Adjust Visual Model inside the container
+                        model.scale.set(4, 4, 4);      // Bigger size
+                        model.position.y = 1.5;        // Lift from ground
+                        model.rotation.y = -Math.PI / 2; // Rotate -90 deg to face Forward (if model faces Left)
+                        
                         model.traverse((node) => {
                             if (node.isMesh) node.castShadow = true;
                         });
-                        scene.add(model);
-                        gameState.current.player = model;
 
-                        // Animation Mixer
+                        playerContainer.add(model);
+                        scene.add(playerContainer);
+                        
+                        gameState.current.player = playerContainer; // Control the container
+
+                        // Animation Mixer (attached to the mesh, not container)
                         if (gltf.animations && gltf.animations.length > 0) {
                             const mixer = new THREE.AnimationMixer(model);
-                            // Play the first animation found
                             const action = mixer.clipAction(gltf.animations[0]);
                             action.play();
                             gameState.current.mixer = mixer;
@@ -204,15 +214,19 @@
                     if (mixer) mixer.update(delta);
 
                     if (player) {
-                        const moveSpeed = 5 * delta;
+                        const moveSpeed = 10 * delta; // Faster speed for bigger character
                         const rotateSpeed = 3 * delta;
 
-                        // Movement Logic (Simple Tank Controls for 3D)
+                        // Movement Logic (Moves the Container)
+                        // Assuming translateZ(positive) moves towards camera (Back)
+                        // and translateZ(negative) moves into screen (Forward)
+                        // Controls: W = Forward (-Z local), S = Back (+Z local)
+                        
                         if (keys.w) {
-                            player.translateZ(moveSpeed); // Assuming model faces +Z or -Z. Tweak if moonwalking.
+                            player.translateZ(-moveSpeed); // Forward
                         }
                         if (keys.s) {
-                            player.translateZ(-moveSpeed);
+                            player.translateZ(moveSpeed);  // Back
                         }
                         if (keys.a) {
                             player.rotation.y += rotateSpeed;
@@ -222,7 +236,7 @@
                         }
 
                         // Camera Follow
-                        const relativeCameraOffset = new THREE.Vector3(0, 5, -8); // Behind player
+                        const relativeCameraOffset = new THREE.Vector3(0, 8, 12); // Higher/Further for bigger char
                         const cameraOffset = relativeCameraOffset.applyMatrix4(player.matrixWorld);
                         
                         // Smooth camera
@@ -237,15 +251,11 @@
                             // Rotate apple
                             apple.rotation.y += delta;
 
-                            if (dist < 1.5) {
+                            if (dist < 3.0) { // Larger collision radius
                                 // Collect!
                                 scene.remove(apple);
                                 apples.splice(i, 1);
-                                
-                                // Update React State from outside loop
                                 setScore(s => s + 1);
-                                
-                                // Play crunch sound if you have it, or just visual
                             }
                         }
                     }
