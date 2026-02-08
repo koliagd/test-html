@@ -27,6 +27,7 @@
         body { margin: 0; overflow: hidden; background-color: #87CEEB; }
         #canvas-container { width: 100vw; height: 100vh; display: block; }
         .ui-overlay { pointer-events: none; }
+        .pointer-events-auto { pointer-events: auto; }
     </style>
 </head>
 <body class="antialiased select-none">
@@ -57,6 +58,12 @@
                 apples: [],
                 score: 0
             });
+
+            const playShotSound = () => {
+                const audio = new Audio('0x01be5440.mp3');
+                audio.volume = 1.0;
+                audio.play().catch(e => console.warn("Не удалось воспроизвести звук:", e));
+            };
 
             useEffect(() => {
                 if (!containerRef.current) return;
@@ -130,8 +137,8 @@
                         
                         // FIX: Adjust Visual Model inside the container
                         model.scale.set(4, 4, 4);      // Bigger size
-                        model.position.y = 4.0;        // Lift higher (was 1.5, causing clipping)
-                        model.rotation.y = Math.PI / 2; // Rotate 90 deg positive (was -90)
+                        model.position.y = 0;          // ON THE GROUND (Reset from 4.0)
+                        model.rotation.y = Math.PI / 2; // Rotate 90 deg positive to face forward
                         
                         model.traverse((node) => {
                             if (node.isMesh) node.castShadow = true;
@@ -142,12 +149,16 @@
                         
                         gameState.current.player = playerContainer; // Control the container
 
-                        // Animation Mixer (attached to the mesh, not container)
+                        // Animation Mixer
                         if (gltf.animations && gltf.animations.length > 0) {
                             const mixer = new THREE.AnimationMixer(model);
+                            // Play the first animation
                             const action = mixer.clipAction(gltf.animations[0]);
-                            action.play();
+                            action.reset().play(); // Force reset and play
                             gameState.current.mixer = mixer;
+                            console.log("Анимация найдена и запущена:", gltf.animations[0].name);
+                        } else {
+                            console.log("Анимации не найдены в GLB файле.");
                         }
 
                         setStatus('PLAYING');
@@ -303,18 +314,28 @@
                         </div>
 
                         {/* Message / Controls */}
-                        <div className="text-center">
+                        <div className="text-center flex flex-col items-center">
                             {message && (
                                 <div className="inline-block bg-red-600/90 text-white px-6 py-3 rounded-xl font-bold mb-4 shadow-lg animate-bounce">
                                     {message}
                                 </div>
                             )}
                             
-                            <div className="bg-slate-900/50 backdrop-blur text-white inline-block px-6 py-3 rounded-full border border-white/10">
+                            <div className="bg-slate-900/50 backdrop-blur text-white inline-block px-6 py-3 rounded-full border border-white/10 mb-4">
                                 <p className="text-sm font-mono opacity-80">
                                     УПРАВЛЕНИЕ: <span className="font-bold text-yellow-400">W A S D</span> или <span className="font-bold text-yellow-400">СТРЕЛКИ</span>
                                 </p>
                             </div>
+                        </div>
+
+                        {/* Action Button */}
+                        <div className="absolute bottom-10 right-10 pointer-events-auto">
+                            <button 
+                                onClick={playShotSound}
+                                className="bg-red-600 hover:bg-red-700 active:scale-95 transition-all text-white font-black text-xl py-6 px-8 rounded-full shadow-2xl border-4 border-red-800 flex items-center gap-2"
+                            >
+                                🔫 БАХ!
+                            </button>
                         </div>
                     </div>
                 </div>
